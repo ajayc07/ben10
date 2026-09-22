@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Omnitrix Alien Database</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2245%22 fill=%22%2300e64d%22/><circle cx=%2250%22 cy=%2250%22 r=%2226%22 fill=%22%23111%22/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Bangers&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="bg-fx" aria-hidden="true">
+  <span class="hexfloat h1"></span>
+  <span class="hexfloat h2"></span>
+  <span class="hexfloat h3"></span>
+  <span class="hexfloat h4"></span>
+  <span class="hexfloat h5"></span>
+</div>
+
+<div id="flashOverlay" aria-hidden="true"></div>
+
+<header class="top-bar">
+  <div class="brand">
+    <div class="omnitrix-badge" id="omnitrixBadge">
+      <div class="ring ring-outer"></div>
+      <div class="ring ring-mid"></div>
+      <div class="core"></div>
+    </div>
+    <div class="brand-text">
+      <h1>OMNITRIX</h1>
+      <p>Alien Database</p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input id="searchInput" type="text" placeholder="Find an alien..." autocomplete="off">
+    </div>
+
+    <div class="view-toggle" id="viewToggle" role="tablist" aria-label="Choose view">
+      <button class="toggle-btn active" data-view="list" role="tab" aria-selected="true">
+        <span class="ico">☰</span> List
+      </button>
+      <button class="toggle-btn" data-view="grid" role="tab" aria-selected="false">
+        <span class="ico">▦</span> Grid
+      </button>
+      <div class="toggle-pill" id="togglePill"></div>
+    </div>
+  </div>
+</header>
+
+<p class="alien-count" id="alienCount">70 Aliens Unlocked!</p>
+
+<main id="cardContainer" class="card-container view-list"></main>
+
+<p id="emptyState" class="empty-state hidden">No aliens found! Try another name 👽</p>
+
+<div id="modalOverlay" class="modal-overlay hidden">
+  <button class="modal-nav prev" id="modalPrev" aria-label="Previous alien">‹</button>
+
+  <div class="modal-card" id="modalCard">
+    <button class="modal-close" id="modalClose" aria-label="Close">✕</button>
+
+    <div class="modal-portrait-wrap">
+      <div class="modal-ring spin-slow"></div>
+      <div class="modal-ring spin-fast reverse"></div>
+      <img id="modalImg" class="modal-portrait" src="" alt="">
+      <div class="particles" id="particles"></div>
+    </div>
+
+    <div class="hero-time" id="heroTime">IT'S HERO TIME!</div>
+
+    <h2 id="modalName" class="modal-name"></h2>
+    <p id="modalSpecies" class="modal-species"></p>
+
+    <div class="stat-list" id="statList"></div>
+  </div>
+
+  <button class="modal-nav next" id="modalNext" aria-label="Next alien">›</button>
+</div>
+
+<script src="data.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
