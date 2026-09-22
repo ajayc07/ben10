@@ -36,11 +36,6 @@
   </div>
 
   <div class="controls">
-    <div class="search-wrap">
-      <span class="search-icon">🔍</span>
-      <input id="searchInput" type="text" placeholder="Find an alien..." autocomplete="off">
-    </div>
-
     <div class="view-toggle" id="viewToggle" role="tablist" aria-label="Choose view">
       <button class="toggle-btn active" data-view="list" role="tab" aria-selected="true">
         <span class="ico">☰</span> List
@@ -50,14 +45,17 @@
       </button>
       <div class="toggle-pill" id="togglePill"></div>
     </div>
+
+    <div class="voice-wrap hidden" id="voiceWrap">
+      <span class="voice-icon">🔊</span>
+      <select id="voiceSelect" aria-label="Choose voice"></select>
+    </div>
   </div>
 </header>
 
 <p class="alien-count" id="alienCount">70 Aliens Unlocked!</p>
 
 <main id="cardContainer" class="card-container view-list"></main>
-
-<p id="emptyState" class="empty-state hidden">No aliens found! Try another name 👽</p>
 
 <div id="modalOverlay" class="modal-overlay hidden">
   <button class="modal-nav prev" id="modalPrev" aria-label="Previous alien">‹</button>

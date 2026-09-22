@@ -11,9 +11,7 @@
   ];
 
   var cardContainer = document.getElementById('cardContainer');
-  var emptyState = document.getElementById('emptyState');
   var alienCount = document.getElementById('alienCount');
-  var searchInput = document.getElementById('searchInput');
   var viewToggle = document.getElementById('viewToggle');
   var modalOverlay = document.getElementById('modalOverlay');
   var modalCard = document.getElementById('modalCard');
@@ -94,26 +92,8 @@
   }
 
   function getVisibleList() {
-    return RENDERED.filter(function (item) { return !item.card.classList.contains('hide'); });
+    return RENDERED;
   }
-
-  /* ---------------- Search / filter ---------------- */
-  function applyFilter() {
-    var q = searchInput.value.trim().toLowerCase();
-    var cards = cardContainer.querySelectorAll('.alien-card');
-    var visible = 0;
-    cards.forEach(function (card) {
-      var match = !q || card.dataset.name.indexOf(q) !== -1 || card.dataset.species.indexOf(q) !== -1;
-      card.classList.toggle('hide', !match);
-      if (match) visible++;
-    });
-    emptyState.classList.toggle('hidden', visible !== 0);
-    alienCount.textContent = q
-      ? visible + ' alien' + (visible === 1 ? '' : 's') + ' found'
-      : DATA.length + ' Aliens Unlocked!';
-  }
-
-  searchInput.addEventListener('input', applyFilter);
 
   /* ---------------- View toggle ---------------- */
   viewToggle.addEventListener('click', function (e) {
@@ -216,6 +196,52 @@
     playSynthPowerUp();
   }
 
+  /* ---------------- Voice picker ---------------- */
+  var voiceWrap = document.getElementById('voiceWrap');
+  var voiceSelect = document.getElementById('voiceSelect');
+  var VOICE_PREF_KEY = 'ben10-voice-name';
+
+  function englishVoices() {
+    if (!('speechSynthesis' in window)) return [];
+    return window.speechSynthesis.getVoices().filter(function (v) { return /^en/i.test(v.lang); });
+  }
+
+  function populateVoices() {
+    var voices = englishVoices();
+    if (!voices.length) return;
+
+    var saved = null;
+    try { saved = localStorage.getItem(VOICE_PREF_KEY); } catch (err) { /* storage unavailable */ }
+
+    voiceSelect.innerHTML = voices.map(function (v) {
+      return '<option value="' + v.name + '">' + v.name + ' (' + v.lang + ')</option>';
+    }).join('');
+
+    if (saved && voices.some(function (v) { return v.name === saved; })) {
+      voiceSelect.value = saved;
+    }
+    voiceWrap.classList.remove('hidden');
+  }
+
+  if ('speechSynthesis' in window) {
+    populateVoices();
+    window.speechSynthesis.addEventListener('voiceschanged', populateVoices);
+  }
+
+  voiceSelect.addEventListener('change', function () {
+    try { localStorage.setItem(VOICE_PREF_KEY, voiceSelect.value); } catch (err) { /* storage unavailable */ }
+    speakAlienName('Ben Ten');
+  });
+
+  function getSelectedVoice() {
+    var voices = englishVoices();
+    if (!voices.length) return null;
+    var chosen = voices.find(function (v) { return v.name === voiceSelect.value; });
+    if (chosen) return chosen;
+    var enUS = voices.find(function (v) { return /en-US/i.test(v.lang); });
+    return enUS || voices[0];
+  }
+
   function speakAlienName(name) {
     if (!('speechSynthesis' in window)) return;
     try {
@@ -224,9 +250,8 @@
       utter.pitch = 1.3;
       utter.rate = 0.95;
       utter.volume = 1;
-      var voices = window.speechSynthesis.getVoices();
-      var enVoice = voices.find(function (v) { return /en/i.test(v.lang); });
-      if (enVoice) utter.voice = enVoice;
+      var voice = getSelectedVoice();
+      if (voice) utter.voice = voice;
       window.speechSynthesis.speak(utter);
     } catch (err) { /* speech not available, ignore */ }
   }
@@ -351,5 +376,5 @@
 
   /* ---------------- Init ---------------- */
   renderCards();
-  applyFilter();
+  alienCount.textContent = DATA.length + ' Aliens Unlocked!';
 })();
