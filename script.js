@@ -116,6 +116,35 @@
     if (mode === 'games' && window.Ben10Games) window.Ben10Games.onShow();
   });
 
+  /* ---------------- Full screen ---------------- */
+  var fullscreenBtn = document.getElementById('fullscreenBtn');
+
+  function isFullscreen() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+
+  function requestFullscreen(el) {
+    if (el.requestFullscreen) return el.requestFullscreen();
+    if (el.webkitRequestFullscreen) return el.webkitRequestFullscreen();
+  }
+
+  function exitFullscreen() {
+    if (document.exitFullscreen) return document.exitFullscreen();
+    if (document.webkitExitFullscreen) return document.webkitExitFullscreen();
+  }
+
+  fullscreenBtn.addEventListener('click', function () {
+    if (isFullscreen()) exitFullscreen();
+    else requestFullscreen(document.documentElement);
+  });
+
+  ['fullscreenchange', 'webkitfullscreenchange'].forEach(function (evt) {
+    document.addEventListener(evt, function () {
+      fullscreenBtn.classList.toggle('active', isFullscreen());
+      fullscreenBtn.textContent = isFullscreen() ? '⛝' : '⛶';
+    });
+  });
+
   /* ---------------- Transformation modal ---------------- */
   var lastFocused = null;
 

@@ -113,16 +113,28 @@
     if (navigator.vibrate) navigator.vibrate(60);
   }
 
+  /* Names whatever he actually tapped, then re-asks the question, so a
+     wrong guess always tells him what he touched instead of just "no". */
+  function speakOopsThenRepeat(wrongLabel, repeatText) {
+    speak('Oops, that’s ' + wrongLabel + '!');
+    setGameTimeout(function () { speak(repeatText); }, 1500);
+  }
+
   /* ================= Count the Aliens ================= */
+  /* Numeral choices must stay within what he can actually read (1-10) —
+     counting objects aloud past 10 is fine, but a numeral answer he
+     can't recognize would make the multiple-choice unsolvable. */
+  var COUNT_MAX = 10;
+
   function countChoices(n) {
     var pool = [];
     [-2, -1, 1, 2].forEach(function (d) {
       var v = n + d;
-      if (v >= 1 && v <= 20 && pool.indexOf(v) === -1) pool.push(v);
+      if (v >= 1 && v <= COUNT_MAX && pool.indexOf(v) === -1) pool.push(v);
     });
     pool = shuffle(pool).slice(0, 2);
     while (pool.length < 2) {
-      var v2 = randInt(1, 20);
+      var v2 = randInt(1, COUNT_MAX);
       if (v2 !== n && pool.indexOf(v2) === -1) pool.push(v2);
     }
     return shuffle([n].concat(pool));
@@ -131,7 +143,7 @@
   function nextCountRound() {
     clearGameTimers();
     var alien = DATA[randInt(0, DATA.length - 1)];
-    var n = randInt(1, 20);
+    var n = randInt(1, COUNT_MAX);
     var counted = 0;
 
     var tilesHtml = '';
@@ -147,6 +159,9 @@
       '<div class="count-stage" id="countStage">' + tilesHtml + '</div>' +
       '<div class="choice-row" id="countChoices">' + choicesHtml + '</div>';
 
+    var askPhrase = 'How many aliens are there?';
+    setGameTimeout(function () { speak(askPhrase); }, 300);
+
     document.getElementById('countStage').addEventListener('click', function (e) {
       var tile = e.target.closest('.count-tile');
       if (!tile || tile.classList.contains('counted')) return;
@@ -160,6 +175,7 @@
       if (!btn) return;
       var val = parseInt(btn.dataset.value, 10);
       if (val === n) {
+        clearGameTimers();
         btn.classList.add('correct');
         handleCorrect();
         setGameTimeout(nextCountRound, 1300);
@@ -167,6 +183,7 @@
         btn.classList.add('wrong');
         handleWrong();
         setGameTimeout(function () { btn.classList.remove('wrong'); }, 400);
+        speakOopsThenRepeat(val, askPhrase);
       }
     });
   }
@@ -198,24 +215,32 @@
     var distractors = shuffle(LETTER_POOL.filter(function (l) { return l !== target; })).slice(0, 3);
     var options = shuffle([target].concat(distractors));
 
+    /* Question is the capital he already knows; choices are the matching
+       lowercase letters — this is how he starts learning lowercase, by
+       anchoring each one to the capital form he can already recognize.
+       Uses choice-btn-lc instead of the display font, which only has
+       true uppercase glyphs (a typed lowercase "a" renders as a small
+       "A" in it). */
     var choicesHtml = options.map(function (l) {
-      return '<button class="choice-btn" data-letter="' + l + '">' + l + '</button>';
+      return '<button class="choice-btn choice-btn-lc" data-letter="' + l + '">' + l.toLowerCase() + '</button>';
     }).join('');
 
     gameContent.innerHTML =
       '<p class="game-prompt">Find the matching letter!</p>' +
-      '<div class="big-letter" id="bigLetter">' + target + '</div>' +
+      '<div class="big-symbol" id="bigLetter">' + target + '</div>' +
       '<div class="choice-row" id="letterChoices">' + choicesHtml + '</div>';
 
+    var askPhrase = 'Find the letter ' + target;
     document.getElementById('bigLetter').addEventListener('click', function () {
-      speak('Find the letter ' + target);
+      speak(askPhrase);
     });
-    setGameTimeout(function () { speak('Find the letter ' + target); }, 300);
+    setGameTimeout(function () { speak(askPhrase); }, 300);
 
     document.getElementById('letterChoices').addEventListener('click', function (e) {
       var btn = e.target.closest('.choice-btn');
       if (!btn) return;
       if (btn.dataset.letter === target) {
+        clearGameTimers();
         btn.classList.add('correct');
         handleCorrect();
         setGameTimeout(function () { showLetterReward(target, alienStartingWith(target)); }, 250);
@@ -224,6 +249,117 @@
         btn.classList.add('wrong');
         handleWrong();
         setGameTimeout(function () { btn.classList.remove('wrong'); }, 400);
+        speakOopsThenRepeat(btn.dataset.letter, askPhrase);
+      }
+    });
+  }
+
+  /* ================= Letter Sounds (phonics recognition) ================= */
+  /* Says the alien's name AND its starting letter up front — asking him
+     to work out the letter from the sound alone was too hard, so this
+     is now a listen-and-find match: hear "Rath starts with W, find W!",
+     then tap W among the choices. The alien link still gets reinforced
+     by repetition, just without requiring him to infer it himself. */
+  function nextSoundRound() {
+    clearGameTimers();
+    var alien = DATA[randInt(0, DATA.length - 1)];
+    var target = alien.name.charAt(0).toUpperCase();
+    var distractors = shuffle(LETTER_POOL.filter(function (l) { return l !== target; })).slice(0, 3);
+    var options = shuffle([target].concat(distractors));
+
+    var choicesHtml = options.map(function (l) {
+      return '<button class="choice-btn" data-letter="' + l + '">' + l + '</button>';
+    }).join('');
+
+    gameContent.innerHTML =
+      '<p class="game-prompt">Listen, then tap the letter it starts with!</p>' +
+      '<div class="sound-alien" id="soundAlien">' +
+        '<img src="' + alien.imageUrl + '" alt="' + alien.name + '">' +
+        '<span class="sound-replay" aria-label="Play sound again">🔊</span>' +
+      '</div>' +
+      '<div class="choice-row" id="soundChoices">' + choicesHtml + '</div>';
+
+    var askPhrase = alien.name + ' starts with ' + target + '. Find ' + target + '!';
+    document.getElementById('soundAlien').addEventListener('click', function () {
+      speak(askPhrase);
+    });
+    setGameTimeout(function () { speak(askPhrase); }, 300);
+
+    document.getElementById('soundChoices').addEventListener('click', function (e) {
+      var btn = e.target.closest('.choice-btn');
+      if (!btn) return;
+
+      if (btn.dataset.letter === target) {
+        clearGameTimers();
+        btn.classList.add('correct');
+        handleCorrect();
+        setGameTimeout(function () { speak('Yes! ' + target + '!'); }, 150);
+        setGameTimeout(nextSoundRound, 2200);
+      } else {
+        btn.classList.add('wrong');
+        handleWrong();
+        setGameTimeout(function () { btn.classList.remove('wrong'); }, 400);
+        speakOopsThenRepeat(btn.dataset.letter, askPhrase);
+      }
+    });
+  }
+
+  /* ================= Number Recognize (10-20) ================= */
+  /* He already recognizes numerals 1-10; this drills the next range he
+     hasn't learned yet, the same shape-matching way as Letter Match. */
+  var NUMBER_MIN = 10;
+  var NUMBER_MAX = 20;
+
+  function showNumberReward(n) {
+    var alien = DATA[randInt(0, DATA.length - 1)];
+    var tilesHtml = '';
+    for (var i = 0; i < n; i++) {
+      tilesHtml += '<div class="count-tile"><img src="' + alien.imageUrl + '" alt="' + alien.name + '"></div>';
+    }
+    var reward = document.createElement('div');
+    reward.className = 'number-reward';
+    reward.innerHTML = '<div class="count-stage">' + tilesHtml + '</div><p>' + n + ' aliens!</p>';
+    gameContent.appendChild(reward);
+    speak(n + ' aliens!');
+  }
+
+  function nextNumberRound() {
+    clearGameTimers();
+    var target = randInt(NUMBER_MIN, NUMBER_MAX);
+    var pool = [];
+    for (var v = NUMBER_MIN; v <= NUMBER_MAX; v++) { if (v !== target) pool.push(v); }
+    var options = shuffle([target].concat(shuffle(pool).slice(0, 3)));
+
+    var choicesHtml = options.map(function (v) {
+      return '<button class="choice-btn" data-value="' + v + '">' + v + '</button>';
+    }).join('');
+
+    gameContent.innerHTML =
+      '<p class="game-prompt">Listen, then tap the number!</p>' +
+      '<div class="big-symbol" id="bigNumber" aria-label="Play the number">🔊</div>' +
+      '<div class="choice-row" id="numberChoices">' + choicesHtml + '</div>';
+
+    var askPhrase = 'Find the number ' + target;
+    document.getElementById('bigNumber').addEventListener('click', function () {
+      speak(askPhrase);
+    });
+    setGameTimeout(function () { speak(askPhrase); }, 300);
+
+    document.getElementById('numberChoices').addEventListener('click', function (e) {
+      var btn = e.target.closest('.choice-btn');
+      if (!btn) return;
+      var val = parseInt(btn.dataset.value, 10);
+      if (val === target) {
+        clearGameTimers();
+        btn.classList.add('correct');
+        handleCorrect();
+        setGameTimeout(function () { showNumberReward(target); }, 250);
+        setGameTimeout(nextNumberRound, 2400);
+      } else {
+        btn.classList.add('wrong');
+        handleWrong();
+        setGameTimeout(function () { btn.classList.remove('wrong'); }, 400);
+        speakOopsThenRepeat(val, askPhrase);
       }
     });
   }
@@ -275,6 +411,7 @@
     memoryLock = true;
 
     if (memoryFirst.dataset.id === second.dataset.id) {
+      clearGameTimers();
       memoryFirst.classList.add('matched');
       second.classList.add('matched');
       memoryMatched++;
@@ -288,6 +425,12 @@
       }
     } else {
       playWrong();
+      var firstAlien = DATA.find(function (a) { return a.id === memoryFirst.dataset.id; });
+      var secondAlien = DATA.find(function (a) { return a.id === second.dataset.id; });
+      if (firstAlien && secondAlien) {
+        speak('Oops, ' + firstAlien.name + ' and ' + secondAlien.name + ' don’t match!');
+        setGameTimeout(function () { speak('Find the matching pairs!'); }, 1500);
+      }
       setGameTimeout(function () {
         memoryFirst.classList.remove('flipped');
         second.classList.remove('flipped');
@@ -309,17 +452,21 @@
     var tilesHtml = '';
     for (var i = 0; i < ODD_GRID_SIZE; i++) {
       var a = (i === oddIndex) ? odd : base;
-      tilesHtml += '<button class="odd-tile" data-odd="' + (i === oddIndex ? '1' : '0') + '"><img src="' + a.imageUrl + '" alt="' + a.name + '"></button>';
+      tilesHtml += '<button class="odd-tile" data-odd="' + (i === oddIndex ? '1' : '0') + '" data-name="' + a.name + '"><img src="' + a.imageUrl + '" alt="' + a.name + '"></button>';
     }
 
     gameContent.innerHTML =
       '<p class="game-prompt">Which alien is different?</p>' +
       '<div class="odd-grid" id="oddGrid">' + tilesHtml + '</div>';
 
+    var askPhrase = 'Which one is different?';
+    setGameTimeout(function () { speak(askPhrase); }, 300);
+
     document.getElementById('oddGrid').addEventListener('click', function (e) {
       var btn = e.target.closest('.odd-tile');
       if (!btn) return;
       if (btn.dataset.odd === '1') {
+        clearGameTimers();
         btn.classList.add('correct');
         handleCorrect();
         setGameTimeout(nextOddRound, 1300);
@@ -327,6 +474,7 @@
         btn.classList.add('wrong');
         handleWrong();
         setGameTimeout(function () { btn.classList.remove('wrong'); }, 400);
+        speakOopsThenRepeat(btn.dataset.name, askPhrase);
       }
     });
   }
@@ -342,6 +490,8 @@
 
     if (key === 'count') nextCountRound();
     else if (key === 'letter') nextLetterRound();
+    else if (key === 'sound') nextSoundRound();
+    else if (key === 'number') nextNumberRound();
     else if (key === 'memory') startMemoryGame();
     else if (key === 'odd') nextOddRound();
   }

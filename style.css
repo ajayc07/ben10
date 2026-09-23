@@ -200,6 +200,24 @@ body {
 .toggle-btn.active { color: var(--black); }
 .toggle-btn .ico { font-size: 15px; }
 
+.fullscreen-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 2px solid var(--green-dark);
+  background: var(--panel);
+  color: var(--white);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color .2s, transform .15s, background .2s;
+}
+.fullscreen-btn:hover { border-color: var(--green); transform: translateY(-1px); }
+.fullscreen-btn:active { transform: scale(.92); }
+.fullscreen-btn.active { background: var(--green); color: var(--black); border-color: var(--green); }
+
 /* ---------- Alien count ---------- */
 .alien-count {
   position: relative;
@@ -719,6 +737,10 @@ body {
 .choice-btn:active { transform: scale(.95); }
 .choice-btn.wrong { animation: shakeX .4s ease; border-color: var(--pink); }
 .choice-btn.correct { border-color: var(--green); box-shadow: var(--shadow-glow); }
+
+/* True lowercase glyphs — the display font (Bangers) only draws capitals,
+   so a lowercase letter in it just renders as a smaller capital. */
+.choice-btn.choice-btn-lc { font-family: var(--font-body); font-weight: 800; }
 @keyframes shakeX {
   0%, 100% { transform: translateX(0); }
   20% { transform: translateX(-10px); }
@@ -753,8 +775,8 @@ body {
 .count-tile:hover { transform: scale(1.08); }
 .count-tile.counted { border-color: var(--orange); box-shadow: 0 0 14px rgba(255,159,28,.6); transform: scale(1.05); }
 
-/* Letter Match */
-.big-letter {
+/* Big target symbol — shared by Letter Match and Number Recognize */
+.big-symbol {
   width: 110px;
   height: 110px;
   border-radius: 50%;
@@ -795,6 +817,49 @@ body {
   0%   { opacity: 0; transform: scale(.4); }
   60%  { opacity: 1; transform: scale(1.08); }
   100% { opacity: 1; transform: scale(1); }
+}
+
+/* Letter Sounds */
+.sound-alien {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 4px solid var(--green);
+  box-shadow: 0 0 26px rgba(57,255,106,.65);
+  cursor: pointer;
+}
+.sound-alien img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 15%; display: block; }
+.sound-replay {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--green);
+  border: 3px solid var(--black);
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 10px rgba(0,0,0,.5);
+}
+
+/* Number Recognize */
+.number-reward {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  animation: popInSmall .5s cubic-bezier(.2,1.6,.4,1) both;
+}
+.number-reward p {
+  font-family: var(--font-display);
+  font-size: 20px;
+  color: var(--white);
+  margin: 0;
 }
 
 /* Memory Match */
