@@ -36,26 +36,56 @@
   </div>
 
   <div class="controls">
-    <div class="view-toggle" id="viewToggle" role="tablist" aria-label="Choose view">
-      <button class="toggle-btn active" data-view="list" role="tab" aria-selected="true">
-        <span class="ico">☰</span> List
+    <div class="mode-toggle" id="modeToggle" role="tablist" aria-label="Choose mode">
+      <button class="toggle-btn active" data-mode="explore" role="tab" aria-selected="true">
+        <span class="ico">🛸</span> Explore
       </button>
-      <button class="toggle-btn" data-view="grid" role="tab" aria-selected="false">
-        <span class="ico">▦</span> Grid
+      <button class="toggle-btn" data-mode="games" role="tab" aria-selected="false">
+        <span class="ico">🎮</span> Games
       </button>
       <div class="toggle-pill" id="togglePill"></div>
-    </div>
-
-    <div class="voice-wrap hidden" id="voiceWrap">
-      <span class="voice-icon">🔊</span>
-      <select id="voiceSelect" aria-label="Choose voice"></select>
     </div>
   </div>
 </header>
 
-<p class="alien-count" id="alienCount">70 Aliens Unlocked!</p>
+<section id="explorePanel">
+  <p class="alien-count" id="alienCount">70 Aliens Unlocked!</p>
+  <main id="cardContainer" class="card-container view-grid"></main>
+</section>
 
-<main id="cardContainer" class="card-container view-list"></main>
+<section id="gamesPanel" class="hidden">
+  <div class="game-hub" id="gameHub">
+    <button class="game-card" data-game="count">
+      <span class="game-card-icon">🔢</span>
+      <span class="game-card-title">Count the Aliens</span>
+      <span class="game-card-desc">Count up to 20!</span>
+    </button>
+    <button class="game-card" data-game="letter">
+      <span class="game-card-icon">🔤</span>
+      <span class="game-card-title">Letter Match</span>
+      <span class="game-card-desc">Find the matching letter!</span>
+    </button>
+    <button class="game-card" data-game="memory">
+      <span class="game-card-icon">🧠</span>
+      <span class="game-card-title">Memory Match</span>
+      <span class="game-card-desc">Find the matching pairs!</span>
+    </button>
+    <button class="game-card" data-game="odd">
+      <span class="game-card-icon">🔍</span>
+      <span class="game-card-title">Spot the Odd One</span>
+      <span class="game-card-desc">Which one is different?</span>
+    </button>
+  </div>
+
+  <div class="game-screen hidden" id="gameScreen">
+    <div class="game-screen-header">
+      <button class="game-back" id="gameBack">‹ Back</button>
+      <div class="game-score" id="gameScore">⭐ 0</div>
+    </div>
+    <div class="game-content" id="gameContent"></div>
+    <div class="game-feedback" id="gameFeedback"></div>
+  </div>
+</section>
 
 <div id="modalOverlay" class="modal-overlay hidden">
   <button class="modal-nav prev" id="modalPrev" aria-label="Previous alien">‹</button>
@@ -83,5 +113,6 @@
 
 <script src="data.js"></script>
 <script src="script.js"></script>
+<script src="games.js"></script>
 </body>
 </html>

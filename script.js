@@ -12,7 +12,9 @@
 
   var cardContainer = document.getElementById('cardContainer');
   var alienCount = document.getElementById('alienCount');
-  var viewToggle = document.getElementById('viewToggle');
+  var modeToggle = document.getElementById('modeToggle');
+  var explorePanel = document.getElementById('explorePanel');
+  var gamesPanel = document.getElementById('gamesPanel');
   var modalOverlay = document.getElementById('modalOverlay');
   var modalCard = document.getElementById('modalCard');
   var modalClose = document.getElementById('modalClose');
@@ -95,21 +97,23 @@
     return RENDERED;
   }
 
-  /* ---------------- View toggle ---------------- */
-  viewToggle.addEventListener('click', function (e) {
+  /* ---------------- Mode toggle (Explore / Games) ---------------- */
+  modeToggle.addEventListener('click', function (e) {
     var btn = e.target.closest('.toggle-btn');
     if (!btn) return;
-    var view = btn.dataset.view;
+    var mode = btn.dataset.mode;
 
-    viewToggle.querySelectorAll('.toggle-btn').forEach(function (b) {
+    modeToggle.querySelectorAll('.toggle-btn').forEach(function (b) {
       var active = b === btn;
       b.classList.toggle('active', active);
       b.setAttribute('aria-selected', active ? 'true' : 'false');
     });
-    viewToggle.classList.toggle('grid-active', view === 'grid');
+    modeToggle.classList.toggle('second-active', mode === 'games');
 
-    cardContainer.classList.remove('view-list', 'view-grid');
-    cardContainer.classList.add('view-' + view);
+    explorePanel.classList.toggle('hidden', mode !== 'explore');
+    gamesPanel.classList.toggle('hidden', mode !== 'games');
+
+    if (mode === 'games' && window.Ben10Games) window.Ben10Games.onShow();
   });
 
   /* ---------------- Transformation modal ---------------- */
@@ -196,48 +200,15 @@
     playSynthPowerUp();
   }
 
-  /* ---------------- Voice picker ---------------- */
-  var voiceWrap = document.getElementById('voiceWrap');
-  var voiceSelect = document.getElementById('voiceSelect');
-  var VOICE_PREF_KEY = 'ben10-voice-name';
-
+  /* ---------------- Voice (auto-picked, no UI) ---------------- */
   function englishVoices() {
     if (!('speechSynthesis' in window)) return [];
     return window.speechSynthesis.getVoices().filter(function (v) { return /^en/i.test(v.lang); });
   }
 
-  function populateVoices() {
-    var voices = englishVoices();
-    if (!voices.length) return;
-
-    var saved = null;
-    try { saved = localStorage.getItem(VOICE_PREF_KEY); } catch (err) { /* storage unavailable */ }
-
-    voiceSelect.innerHTML = voices.map(function (v) {
-      return '<option value="' + v.name + '">' + v.name + ' (' + v.lang + ')</option>';
-    }).join('');
-
-    if (saved && voices.some(function (v) { return v.name === saved; })) {
-      voiceSelect.value = saved;
-    }
-    voiceWrap.classList.remove('hidden');
-  }
-
-  if ('speechSynthesis' in window) {
-    populateVoices();
-    window.speechSynthesis.addEventListener('voiceschanged', populateVoices);
-  }
-
-  voiceSelect.addEventListener('change', function () {
-    try { localStorage.setItem(VOICE_PREF_KEY, voiceSelect.value); } catch (err) { /* storage unavailable */ }
-    speakAlienName('Ben Ten');
-  });
-
   function getSelectedVoice() {
     var voices = englishVoices();
     if (!voices.length) return null;
-    var chosen = voices.find(function (v) { return v.name === voiceSelect.value; });
-    if (chosen) return chosen;
     var enUS = voices.find(function (v) { return /en-US/i.test(v.lang); });
     return enUS || voices[0];
   }
@@ -377,4 +348,6 @@
   /* ---------------- Init ---------------- */
   renderCards();
   alienCount.textContent = DATA.length + ' Aliens Unlocked!';
+
+  window.Ben10Speak = speakAlienName;
 })();
