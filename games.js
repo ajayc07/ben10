@@ -479,9 +479,440 @@
     });
   }
 
+  /* ================= More or Less ================= */
+  /* Two groups side by side; he taps the one with MORE (or LESS). Sizes
+     always differ by at least 2 so the answer can be seen at a glance
+     as well as counted, and stay within 1-10 like Count the Aliens. */
+  var COMPARE_MAX = 10;
+
+  function compareGroupHtml(side, alien, n) {
+    var tiles = '';
+    for (var i = 0; i < n; i++) {
+      tiles += '<div class="count-tile"><img src="' + alien.imageUrl + '" alt="' + alien.name + '"></div>';
+    }
+    return '<button class="compare-group" data-side="' + side + '">' +
+      '<div class="compare-tiles">' + tiles + '</div>' +
+      '<span class="compare-count">' + n + '</span>' +
+    '</button>';
+  }
+
+  function nextCompareRound() {
+    clearGameTimers();
+    var wantMore = Math.random() < 0.5;
+    var word = wantMore ? 'more' : 'less';
+    var counts = { left: randInt(1, COMPARE_MAX), right: 0 };
+    do { counts.right = randInt(1, COMPARE_MAX); } while (Math.abs(counts.left - counts.right) < 2);
+    var answer = (counts.left > counts.right) === wantMore ? 'left' : 'right';
+    var aliens = shuffle(DATA.slice()).slice(0, 2);
+
+    gameContent.innerHTML =
+      '<p class="game-prompt">Which side has <span class="compare-word ' + word + '">' + word.toUpperCase() + '</span>?</p>' +
+      '<div class="compare-row" id="compareRow">' +
+        compareGroupHtml('left', aliens[0], counts.left) +
+        '<span class="compare-vs">VS</span>' +
+        compareGroupHtml('right', aliens[1], counts.right) +
+      '</div>';
+
+    var askPhrase = 'Which side has ' + word + ' aliens?';
+    setGameTimeout(function () { speak(askPhrase); }, 300);
+
+    var row = document.getElementById('compareRow');
+    row.addEventListener('click', function (e) {
+      var btn = e.target.closest('.compare-group');
+      if (!btn || row.classList.contains('revealed')) return;
+      var side = btn.dataset.side;
+      var other = side === 'left' ? 'right' : 'left';
+      if (side === answer) {
+        clearGameTimers();
+        row.classList.add('revealed');
+        btn.classList.add('correct');
+        handleCorrect();
+        setGameTimeout(function () {
+          speak('Yes! ' + counts[side] + ' is ' + word + ' than ' + counts[other] + '!');
+        }, 150);
+        setGameTimeout(nextCompareRound, 2600);
+      } else {
+        btn.classList.add('wrong');
+        handleWrong();
+        setGameTimeout(function () { btn.classList.remove('wrong'); }, 400);
+        speak('Oops, that side has ' + counts[side] + '. That’s ' + (wantMore ? 'less' : 'more') + '!');
+        setGameTimeout(function () { speak(askPhrase); }, 2000);
+      }
+    });
+  }
+
+  /* ================= Shared arrow + OK controls ================= */
+  /* Arrow Quest, Omnitrix Dial and Find It! all use the same D-pad:
+     keyboard arrows plus Enter/Space as "OK", mirrored by on-screen
+     buttons (which also make them playable on a touch screen). Every
+     press lights up its on-screen twin so he links the key, the arrow
+     symbol and the word. */
+  var HINT_MS = 7000;
+  var DIRS = {
+    up:    { dx: 0,  dy: -1, arrow: '⬆', label: 'UP' },
+    left:  { dx: -1, dy: 0,  arrow: '⬅', label: 'LEFT' },
+    ok:    { dx: 0,  dy: 0,  arrow: '✔', label: 'OK' },
+    right: { dx: 1,  dy: 0,  arrow: '➡', label: 'RIGHT' },
+    down:  { dx: 0,  dy: 1,  arrow: '⬇', label: 'DOWN' }
+  };
+  var KEY_TO_DIR = {
+    ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+    Enter: 'ok', ' ': 'ok'
+  };
+  var keyAction = null; // current game's handler: 'up' | 'down' | 'left' | 'right' | 'ok'
+  var hintTimer = null;
+
+  document.addEventListener('keydown', function (e) {
+    var dir = KEY_TO_DIR[e.key];
+    if (!dir || !keyAction) return;
+    // Panel hidden (switched to Explore) — leave the keys alone.
+    if (gameScreen.offsetParent === null) return;
+    e.preventDefault();
+    if (e.repeat) return; // one press = one step, so he has to press again
+    flashDpadBtn(dir, 'pressed');
+    keyAction(dir);
+  });
+
+  function dpadHtml(keys) {
+    return '<div class="dpad" id="dpad">' + keys.map(function (k) {
+      return '<button class="dpad-btn dpad-' + k + '" data-dir="' + k + '" aria-label="' + DIRS[k].label + '">' +
+        '<span class="dpad-arrow">' + DIRS[k].arrow + '</span>' +
+        '<span class="dpad-label">' + DIRS[k].label + '</span>' +
+      '</button>';
+    }).join('') + '</div>';
+  }
+
+  /* Call after rendering a dpadHtml(); `action` receives each press. */
+  function useControls(action) {
+    keyAction = action;
+    // A still-focused button would also react to Enter/Space.
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    document.getElementById('dpad').addEventListener('click', function (e) {
+      var btn = e.target.closest('.dpad-btn');
+      if (!btn || !keyAction) return;
+      btn.blur();
+      flashDpadBtn(btn.dataset.dir, 'pressed');
+      keyAction(btn.dataset.dir);
+    });
+  }
+
+  function stopControls() {
+    keyAction = null;
+    hintTimer = null;
+  }
+
+  function flashDpadBtn(dir, cls) {
+    var btn = gameContent.querySelector('.dpad-btn[data-dir="' + dir + '"]');
+    if (!btn) return;
+    btn.classList.remove('pressed', 'hint');
+    void btn.offsetWidth;
+    btn.classList.add(cls);
+  }
+
+  /* After HINT_MS without a press, flash the button he needs next
+     (from `nextDir()`) and say it. Call again on every press to reset. */
+  function scheduleHint(nextDir) {
+    if (hintTimer) clearTimeout(hintTimer);
+    hintTimer = setGameTimeout(function () {
+      if (!keyAction) return;
+      var dir = nextDir();
+      flashDpadBtn(dir, 'hint');
+      speak(dir === 'ok' ? 'Press OK!' : 'Try the ' + dir + ' arrow!');
+      scheduleHint(nextDir);
+    }, HINT_MS);
+  }
+
+  function stepToward(x, y, tx, ty) {
+    if (tx > x) return 'right';
+    if (tx < x) return 'left';
+    if (ty > y) return 'down';
+    if (ty < y) return 'up';
+    return 'ok';
+  }
+
+  function bump(el) {
+    el.classList.remove('bump');
+    void el.offsetWidth;
+    el.classList.add('bump');
+    playWrong();
+    speak('Oops, that’s the wall!');
+  }
+
+  /* ================= Arrow Quest ================= */
+  /* Move an alien around a grid with the arrows to reach the Omnitrix.
+     Every move is spoken ("up!"). First rounds put the target in a
+     straight line (one direction to learn at a time). */
+  var ARROW_SIZE = 5;
+  var ARROW_STRAIGHT_ROUNDS = 4;
+  var arrowState = null;
+  var arrowRounds = 0;
+
+  function placeArrowPlayer() {
+    var s = arrowState;
+    s.player.style.transform = 'translate(' + (s.x * 100) + '%, ' + (s.y * 100) + '%)';
+  }
+
+  function arrowHintDir() {
+    var s = arrowState;
+    return stepToward(s.x, s.y, s.tx, s.ty);
+  }
+
+  function arrowMove(dir) {
+    var s = arrowState;
+    if (s.done || dir === 'ok') return;
+    var d = DIRS[dir];
+    var nx = s.x + d.dx, ny = s.y + d.dy;
+    scheduleHint(arrowHintDir);
+
+    if (nx < 0 || ny < 0 || nx >= ARROW_SIZE || ny >= ARROW_SIZE) {
+      bump(s.player);
+      return;
+    }
+
+    s.x = nx; s.y = ny;
+    placeArrowPlayer();
+
+    if (s.x === s.tx && s.y === s.ty) {
+      s.done = true;
+      clearGameTimers();
+      document.getElementById('arrowTarget').classList.add('reached');
+      handleCorrect();
+      speak('You made it!');
+      arrowRounds++;
+      setGameTimeout(nextArrowRound, 1800);
+    } else {
+      speak(dir);
+    }
+  }
+
+  function nextArrowRound() {
+    clearGameTimers();
+    var alien = DATA[randInt(0, DATA.length - 1)];
+    var x = randInt(0, ARROW_SIZE - 1), y = randInt(0, ARROW_SIZE - 1);
+    var tx, ty;
+    do {
+      if (arrowRounds < ARROW_STRAIGHT_ROUNDS) {
+        // Same row or same column, so only one arrow is needed.
+        if (Math.random() < 0.5) { tx = randInt(0, ARROW_SIZE - 1); ty = y; }
+        else { tx = x; ty = randInt(0, ARROW_SIZE - 1); }
+      } else {
+        tx = randInt(0, ARROW_SIZE - 1); ty = randInt(0, ARROW_SIZE - 1);
+      }
+    } while (Math.abs(tx - x) + Math.abs(ty - y) < 2);
+
+    var cells = '';
+    for (var i = 0; i < ARROW_SIZE * ARROW_SIZE; i++) cells += '<div class="arrow-cell"></div>';
+
+    gameContent.innerHTML =
+      '<p class="game-prompt">Use the arrow keys to reach the Omnitrix!</p>' +
+      '<div class="arrow-board" id="arrowBoard" style="--n:' + ARROW_SIZE + '">' +
+        cells +
+        '<div class="arrow-target" id="arrowTarget" style="transform:translate(' + (tx * 100) + '%, ' + (ty * 100) + '%)"><span></span></div>' +
+        '<div class="arrow-player" id="arrowPlayer"><img src="' + alien.imageUrl + '" alt="' + alien.name + '"></div>' +
+      '</div>' +
+      dpadHtml(['up', 'left', 'right', 'down']);
+
+    arrowState = {
+      x: x, y: y, tx: tx, ty: ty, done: false,
+      player: document.getElementById('arrowPlayer')
+    };
+    placeArrowPlayer();
+    useControls(arrowMove);
+
+    setGameTimeout(function () { speak('Help ' + alien.name + ' get to the Omnitrix!'); }, 300);
+    scheduleHint(arrowHintDir);
+  }
+
+  /* ================= Omnitrix Dial ================= */
+  /* Just like Ben's watch: turn the dial with LEFT / RIGHT until the
+     alien shown on top is in the middle, then press OK to transform.
+     Only two arrows plus OK, so it's the gentle intro to "select". */
+  var DIAL_POOL = 6;
+  var dialState = null;
+
+  function dialAt(offset) {
+    var s = dialState;
+    var n = s.aliens.length;
+    return s.aliens[((s.index + offset) % n + n) % n];
+  }
+
+  function renderDial(turn) {
+    var html = '';
+    for (var off = -2; off <= 2; off++) {
+      var a = dialAt(off);
+      html += '<div class="dial-slot dial-pos' + off + '"><img src="' + a.imageUrl + '" alt="' + a.name + '"></div>';
+    }
+    var track = document.getElementById('dialTrack');
+    track.innerHTML = html;
+    track.classList.remove('turn-left', 'turn-right');
+    if (turn) {
+      void track.offsetWidth;
+      track.classList.add('turn-' + turn);
+    }
+  }
+
+  /* Shortest way round the dial to the target. */
+  function dialHintDir() {
+    var s = dialState;
+    var n = s.aliens.length;
+    var fwd = ((s.target - s.index) % n + n) % n;
+    if (fwd === 0) return 'ok';
+    return fwd <= n - fwd ? 'right' : 'left';
+  }
+
+  function dialPress(dir) {
+    var s = dialState;
+    if (s.done) return;
+    scheduleHint(dialHintDir);
+
+    if (dir === 'up' || dir === 'down') {
+      speak('Use left and right to turn the dial!');
+      return;
+    }
+    if (dir === 'left' || dir === 'right') {
+      s.index += dir === 'right' ? 1 : -1;
+      renderDial(dir);
+      speak(dialAt(0).name);
+      return;
+    }
+
+    var picked = dialAt(0);
+    var want = s.aliens[s.target];
+    if (picked === want) {
+      s.done = true;
+      clearGameTimers();
+      document.getElementById('dialFace').classList.add('transform');
+      handleCorrect();
+      speak('It’s hero time! ' + want.name + '!');
+      setGameTimeout(nextDialRound, 2200);
+    } else {
+      handleWrong();
+      speakOopsThenRepeat(picked.name, 'Find ' + want.name + '!');
+    }
+  }
+
+  function nextDialRound() {
+    clearGameTimers();
+    var aliens = shuffle(DATA.slice()).slice(0, DIAL_POOL);
+    var target = randInt(1, DIAL_POOL - 1); // never already in the middle
+    dialState = { aliens: aliens, index: 0, target: target, done: false };
+    var want = aliens[target];
+
+    gameContent.innerHTML =
+      '<p class="game-prompt">Turn the dial and press OK!</p>' +
+      '<div class="dial-want" id="dialWant">' +
+        '<img src="' + want.imageUrl + '" alt="' + want.name + '">' +
+        '<span>' + want.name + '</span>' +
+      '</div>' +
+      '<div class="dial-face" id="dialFace">' +
+        '<div class="dial-track" id="dialTrack"></div>' +
+      '</div>' +
+      dpadHtml(['up', 'left', 'ok', 'right', 'down']);
+
+    renderDial(null);
+    useControls(dialPress);
+
+    var askPhrase = 'Find ' + want.name + '!';
+    document.getElementById('dialWant').addEventListener('click', function () { speak(askPhrase); });
+    setGameTimeout(function () { speak(askPhrase); }, 300);
+    scheduleHint(dialHintDir);
+  }
+
+  /* ================= Find It! ================= */
+  /* A 3x3 grid of letters or numbers (alternating rounds). Move the
+     yellow box with the arrows, press OK on the one that was asked for.
+     Uses symbols he already knows so the new skill is the steering. */
+  var FIND_SIZE = 3;
+  var ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  var NUMBERS_1_20 = Array.from({ length: 20 }, function (_, i) { return String(i + 1); });
+  var findState = null;
+  var findRounds = 0;
+
+  function placeFindCursor() {
+    var s = findState;
+    s.cells.forEach(function (c, i) {
+      c.classList.toggle('cursor', i === s.y * FIND_SIZE + s.x);
+    });
+  }
+
+  function findHintDir() {
+    var s = findState;
+    return stepToward(s.x, s.y, s.tpos % FIND_SIZE, Math.floor(s.tpos / FIND_SIZE));
+  }
+
+  function findPress(dir) {
+    var s = findState;
+    if (s.done) return;
+    scheduleHint(findHintDir);
+
+    if (dir !== 'ok') {
+      var d = DIRS[dir];
+      var nx = s.x + d.dx, ny = s.y + d.dy;
+      if (nx < 0 || ny < 0 || nx >= FIND_SIZE || ny >= FIND_SIZE) {
+        bump(document.getElementById('findGrid'));
+        return;
+      }
+      s.x = nx; s.y = ny;
+      placeFindCursor();
+      speak(dir);
+      return;
+    }
+
+    var pos = s.y * FIND_SIZE + s.x;
+    var cell = s.cells[pos];
+    if (pos === s.tpos) {
+      s.done = true;
+      clearGameTimers();
+      cell.classList.add('correct');
+      handleCorrect();
+      setGameTimeout(function () { speak('Yes! ' + s.items[pos] + '!'); }, 150);
+      findRounds++;
+      setGameTimeout(nextFindRound, 1800);
+    } else {
+      cell.classList.remove('wrong');
+      void cell.offsetWidth;
+      cell.classList.add('wrong');
+      handleWrong();
+      setGameTimeout(function () { cell.classList.remove('wrong'); }, 400);
+      speakOopsThenRepeat(s.items[pos], s.askPhrase);
+    }
+  }
+
+  function nextFindRound() {
+    clearGameTimers();
+    var numbers = findRounds % 2 === 1;
+    var items = shuffle(numbers ? NUMBERS_1_20 : ALPHABET).slice(0, FIND_SIZE * FIND_SIZE);
+    var center = Math.floor(FIND_SIZE * FIND_SIZE / 2);
+    var tpos;
+    do { tpos = randInt(0, items.length - 1); } while (tpos === center);
+    var target = items[tpos];
+    var askPhrase = 'Find ' + (numbers ? 'the number ' : 'the letter ') + target + '!';
+
+    gameContent.innerHTML =
+      '<p class="game-prompt">Move the yellow box and press OK!</p>' +
+      '<div class="big-symbol" id="findTarget">' + target + '</div>' +
+      '<div class="find-grid" id="findGrid" style="--n:' + FIND_SIZE + '">' +
+        items.map(function (v) { return '<div class="find-cell">' + v + '</div>'; }).join('') +
+      '</div>' +
+      dpadHtml(['up', 'left', 'ok', 'right', 'down']);
+
+    findState = {
+      items: items, tpos: tpos, askPhrase: askPhrase, done: false,
+      x: center % FIND_SIZE, y: Math.floor(center / FIND_SIZE),
+      cells: Array.prototype.slice.call(gameContent.querySelectorAll('.find-cell'))
+    };
+    placeFindCursor();
+    useControls(findPress);
+
+    document.getElementById('findTarget').addEventListener('click', function () { speak(askPhrase); });
+    setGameTimeout(function () { speak(askPhrase); }, 300);
+    scheduleHint(findHintDir);
+  }
+
   /* ================= Hub / navigation ================= */
   function startGame(key) {
     clearGameTimers();
+    stopControls();
     score = 0;
     updateScore();
     gameHub.classList.add('hidden');
@@ -494,10 +925,15 @@
     else if (key === 'number') nextNumberRound();
     else if (key === 'memory') startMemoryGame();
     else if (key === 'odd') nextOddRound();
+    else if (key === 'compare') nextCompareRound();
+    else if (key === 'arrow') { arrowRounds = 0; nextArrowRound(); }
+    else if (key === 'dial') nextDialRound();
+    else if (key === 'find') { findRounds = 0; nextFindRound(); }
   }
 
   function backToHub() {
     clearGameTimers();
+    stopControls();
     if ('speechSynthesis' in window) window.speechSynthesis.cancel();
     gameScreen.classList.add('hidden');
     gameHub.classList.remove('hidden');
